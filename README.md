@@ -28,7 +28,7 @@ This folder is created automatically when the plugin first loads. You need to ge
 
 ### Step 1 — Export a route from Spansh
 
-1. Go to [spansh.co.uk](https://spansh.co.uk) and plan your route (Exact Plotter or Road to Riches)
+1. Go to [spansh.co.uk](https://spansh.co.uk) and plan your route (Galaxy Plotter or Road to Riches)
 2. When the route is ready, download it as a **CSV** or **JSON** file
 
 > **Note:** FSD injection data is only available in JSON exports, not CSV.
