@@ -7,7 +7,7 @@ import glob
 import subprocess
 import pwd
 
-DEFAULT_ROUTE_FOLDER = os.path.join(decky.DECKY_USER_HOME, "EliteDeckRoute")
+DEFAULT_ROUTE_FOLDER = os.path.join(decky.DECKY_USER_HOME, "EliteDeckyRoutes")
 SETTINGS_FILE = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "settings.json")
 XCLIP = os.path.join(os.path.dirname(__file__), "xclip")
 

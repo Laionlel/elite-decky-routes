@@ -19,7 +19,7 @@ Navigate routes planned on [Spansh](https://spansh.co.uk) without typing system 
 The plugin reads route files from a specific folder on your Steam Deck:
 
 ```
-/home/deck/EliteDeckRoute/
+/home/deck/EliteDeckyRoutes/
 ```
 
 This folder is created automatically when the plugin first loads. You need to get your Spansh route files into this folder — the recommended way is SyncThing, but you can also use a USB drive.
@@ -48,7 +48,7 @@ SyncThing automatically syncs a folder between your PC/Mac and your Steam Deck o
 1. Download and install SyncThing from [syncthing.net](https://syncthing.net)
 2. Open SyncThing in your browser (it opens automatically, usually at `http://127.0.0.1:8384`)
 3. Click **Add Folder**
-4. Set the folder path to wherever you want to store your route files (e.g. `~/Documents/EliteDeckRoute`)
+4. Set the folder path to wherever you want to store your route files (e.g. `~/Documents/EliteDeckyRoutes`)
 5. Note down your **Device ID** — you'll need it for the Deck (it's shown under **Actions → Show ID**)
 
 **On your Steam Deck:**
@@ -65,7 +65,7 @@ SyncThing automatically syncs a folder between your PC/Mac and your Steam Deck o
 6. Accept the connection on your PC/Mac when prompted
 7. Click **Add Folder** on the Deck, set the folder path to:
    ```
-   /home/deck/EliteDeckRoute
+   /home/deck/EliteDeckyRoutes
    ```
 8. Under the **Sharing** tab, share it with your PC/Mac device
 9. Accept the folder share on your PC/Mac
@@ -77,7 +77,7 @@ From now on, any file you drop into the folder on your PC/Mac will automatically
 1. Copy your route file to a USB drive
 2. Plug it into your Steam Deck
 3. Switch to Desktop Mode (Steam button → Power → Switch to Desktop)
-4. Open the file manager and copy the route file to `/home/deck/EliteDeckRoute/`
+4. Open the file manager and copy the route file to `/home/deck/EliteDeckyRoutes/`
 
 ---
 
