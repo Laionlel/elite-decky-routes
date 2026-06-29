@@ -92,7 +92,12 @@ class Plugin:
                 with open(newest, encoding="utf-8") as f:
                     data = json.load(f)
                 result = data.get("result", data)
-                if "system_jumps" in result:
+                if isinstance(result, list):
+                    # Road to Riches JSON — result is a list of systems with bodies
+                    for item in result:
+                        bodies = [b["name"] for b in item.get("bodies", []) if b.get("name")]
+                        stops.append({"system": item.get("name", ""), "bodies": bodies, "neutron": False, "refuel": False, "inject": False, "distance": 0.0})
+                elif "system_jumps" in result:
                     jumps = result["system_jumps"]
                     stops = [{"system": j["system"], "bodies": [], "neutron": bool(j.get("neutron_star")), "refuel": bool(j.get("must_refuel")), "inject": bool(j.get("must_inject")), "distance": float(j.get("distance", 0) or 0)} for j in jumps]
                 elif "jumps" in result:

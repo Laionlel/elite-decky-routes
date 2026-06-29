@@ -101,15 +101,6 @@ From now on, any file you drop into the folder on your PC/Mac will automatically
 
 ---
 
-## Supported route types
-
-| Route type | CSV | JSON |
-|---|---|---|
-| Exact Plotter (travel) | ✅ | ✅ |
-| Road to Riches | ✅ | — |
-
----
-
 ## License
 
 BSD 3-Clause License — see [LICENSE](LICENSE)
