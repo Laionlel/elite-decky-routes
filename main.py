@@ -7,21 +7,53 @@ import glob
 import subprocess
 import pwd
 
-ROUTE_FOLDER = os.path.join(decky.DECKY_USER_HOME, "EliteDeckRoute")
+DEFAULT_ROUTE_FOLDER = os.path.join(decky.DECKY_USER_HOME, "EliteDeckRoute")
+SETTINGS_FILE = os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "settings.json")
 XCLIP = os.path.join(os.path.dirname(__file__), "xclip")
 
 
+def _load_settings() -> dict:
+    try:
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_settings(settings: dict):
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(settings, f)
+
+
 class Plugin:
-    _route_stops: list = []   # [{"system": str, "bodies": [str, ...]}, ...]
+    _route_stops: list = []
     _current_index: int = 0
     _loaded_file: str = ""
+    _route_folder: str = DEFAULT_ROUTE_FOLDER
+
+    async def get_route_folder(self) -> str:
+        return self._route_folder
+
+    async def set_route_folder(self, path: str) -> dict:
+        try:
+            path = path.strip()
+            os.makedirs(path, exist_ok=True)
+            self._route_folder = path
+            settings = _load_settings()
+            settings["route_folder"] = path
+            _save_settings(settings)
+            return {"success": True}
+        except Exception as e:
+            decky.logger.error(f"set_route_folder: {e}")
+            return {"success": False, "error": str(e)}
 
     async def list_files(self) -> dict:
         try:
-            os.makedirs(ROUTE_FOLDER, exist_ok=True)
+            os.makedirs(self._route_folder, exist_ok=True)
             files = (
-                glob.glob(os.path.join(ROUTE_FOLDER, "*.csv")) +
-                glob.glob(os.path.join(ROUTE_FOLDER, "*.json"))
+                glob.glob(os.path.join(self._route_folder, "*.csv")) +
+                glob.glob(os.path.join(self._route_folder, "*.json"))
             )
             files.sort(key=os.path.getmtime, reverse=True)
             return {"success": True, "files": [os.path.basename(f) for f in files]}
@@ -30,18 +62,18 @@ class Plugin:
 
     async def load_from_folder(self, filename: str = "") -> dict:
         try:
-            os.makedirs(ROUTE_FOLDER, exist_ok=True)
+            os.makedirs(self._route_folder, exist_ok=True)
 
             files = (
-                glob.glob(os.path.join(ROUTE_FOLDER, "*.csv")) +
-                glob.glob(os.path.join(ROUTE_FOLDER, "*.json"))
+                glob.glob(os.path.join(self._route_folder, "*.csv")) +
+                glob.glob(os.path.join(self._route_folder, "*.json"))
             )
 
             if not files:
-                return {"success": False, "error": f"No route file found in {ROUTE_FOLDER}"}
+                return {"success": False, "error": f"No route file found in {self._route_folder}"}
 
             if filename:
-                target = os.path.join(ROUTE_FOLDER, filename)
+                target = os.path.join(self._route_folder, filename)
                 if not os.path.isfile(target):
                     return {"success": False, "error": f"File not found: {filename}"}
                 newest = target
@@ -55,7 +87,6 @@ class Plugin:
                     rows = list(reader)
 
                 if rows and "Body Name" in rows[0]:
-                    # Road to Riches format — group bodies by system, no flags
                     for row in rows:
                         system = row.get("System Name", "").strip()
                         body = row.get("Body Name", "").strip()
@@ -66,7 +97,6 @@ class Plugin:
                         else:
                             stops.append({"system": system, "bodies": [body], "neutron": False, "refuel": False, "inject": False, "distance": 0.0})
                 else:
-                    # Travel route format — one system per row, with flags
                     for row in rows:
                         system = (
                             row.get("System Name") or
@@ -93,7 +123,6 @@ class Plugin:
                     data = json.load(f)
                 result = data.get("result", data)
                 if isinstance(result, list):
-                    # Road to Riches JSON — result is a list of systems with bodies
                     for item in result:
                         bodies = [b["name"] for b in item.get("bodies", []) if b.get("name")]
                         stops.append({"system": item.get("name", ""), "bodies": bodies, "neutron": False, "refuel": False, "inject": False, "distance": 0.0})
@@ -125,7 +154,7 @@ class Plugin:
             "current_index": self._current_index,
             "total": len(self._route_stops),
             "loaded_file": self._loaded_file,
-            "route_folder": ROUTE_FOLDER,
+            "route_folder": self._route_folder,
         }
 
     async def jump_to_system(self, name: str) -> dict:
@@ -134,7 +163,6 @@ class Plugin:
             if stop["system"].lower() == name:
                 self._current_index = i
                 return {"success": True, "current_index": i}
-        # Fallback: partial match
         for i, stop in enumerate(self._route_stops):
             if name in stop["system"].lower():
                 self._current_index = i
@@ -157,7 +185,6 @@ class Plugin:
         try:
             deck = pwd.getpwnam("deck")
             uid, gid = deck.pw_uid, deck.pw_gid
-
             env = {
                 "DISPLAY": ":0",
                 "XAUTHORITY": f"/run/user/{uid}/Xauthority",
@@ -191,11 +218,13 @@ class Plugin:
         self._loaded_file = ""
 
     async def _main(self):
-        os.makedirs(ROUTE_FOLDER, exist_ok=True)
-        decky.logger.info(f"Elite Deck Route ready — watching {ROUTE_FOLDER}")
+        settings = _load_settings()
+        self._route_folder = settings.get("route_folder", DEFAULT_ROUTE_FOLDER)
+        os.makedirs(self._route_folder, exist_ok=True)
+        decky.logger.info(f"Elite Decky Routes ready — watching {self._route_folder}")
 
     async def _unload(self):
-        decky.logger.info("Elite Deck Route unloaded")
+        decky.logger.info("Elite Decky Routes unloaded")
 
     async def _uninstall(self):
         pass

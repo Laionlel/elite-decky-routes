@@ -20,6 +20,8 @@ const goBack = callable<[], { success: boolean; current_index: number }>("go_bac
 const copyToClipboard = callable<[text: string], { success: boolean; error?: string }>("copy_to_clipboard");
 const clearRoute = callable<[], void>("clear_route");
 const jumpToSystem = callable<[name: string], { success: boolean; current_index?: number; error?: string }>("jump_to_system");
+const getRouteFolder = callable<[], string>("get_route_folder");
+const saveFolderPath = callable<[path: string], { success: boolean; error?: string }>("set_route_folder");
 
 function Content() {
   const [stops, setStops] = useState<Stop[]>([]);
@@ -34,6 +36,7 @@ function Content() {
   const [findQuery, setFindQuery] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
+  const [folderInput, setFolderInput] = useState("");
 
   useEffect(() => {
     getState().then((state) => {
@@ -76,6 +79,23 @@ function Content() {
   const handleShowPicker = async () => {
     await refreshFileList();
     setShowPicker(true);
+  };
+
+  const handleShowOptions = async () => {
+    const folder = await getRouteFolder();
+    setFolderInput(folder);
+    setShowOptions(true);
+  };
+
+  const handleSaveFolder = async () => {
+    if (!folderInput.trim()) return;
+    const result = await saveFolderPath(folderInput.trim());
+    if (result.success) {
+      setRouteFolder(folderInput.trim());
+      toaster.toast({ title: "Folder saved", body: folderInput.trim() });
+    } else {
+      toaster.toast({ title: "Invalid path", body: result.error ?? "Could not create folder" });
+    }
   };
 
   const handleFind = async () => {
@@ -132,7 +152,7 @@ function Content() {
 
   if (showOptions) {
     return (
-      <PanelSection title="Elite Deck Route">
+      <PanelSection>
         <PanelSectionRow>
           <ToggleField
             label="Auto-advance on copy"
@@ -140,6 +160,18 @@ function Content() {
             checked={autoAdvance}
             onChange={setAutoAdvance}
           />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <TextField
+            label="Routes folder"
+            value={folderInput}
+            onChange={(e) => setFolderInput(e.target.value)}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={handleSaveFolder}>
+            Save Folder
+          </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <ButtonItem layout="below" onClick={() => setShowOptions(false)}>
@@ -152,7 +184,7 @@ function Content() {
 
   if (showFinder) {
     return (
-      <PanelSection title="Elite Deck Route">
+      <PanelSection>
         <PanelSectionRow>
           <TextField
             label="System name"
@@ -176,7 +208,7 @@ function Content() {
 
   if (showPicker) {
     return (
-      <PanelSection title="Elite Deck Route">
+      <PanelSection>
         <PanelSectionRow>
           <div style={{ color: "#8b9bb4", fontSize: "11px" }}>Select a route file:</div>
         </PanelSectionRow>
@@ -202,12 +234,15 @@ function Content() {
   }
 
   return (
-    <PanelSection title="Elite Deck Route">
+    <PanelSection>
       {hasRoute && (
         <>
           <PanelSectionRow>
-            <div style={{ color: "#8b9bb4", fontSize: "11px" }}>
-              Stop {currentIndex + 1} of {stops.length} · {loadedFile}
+            <div>
+              <div style={{ color: "#8b9bb4", fontSize: "11px" }}>{loadedFile}</div>
+              <div style={{ color: "#5a6a80", fontSize: "10px", marginTop: "2px", letterSpacing: "0.05em" }}>
+                STOP {currentIndex + 1} OF {stops.length}
+              </div>
             </div>
           </PanelSectionRow>
 
@@ -295,7 +330,7 @@ function Content() {
           </PanelSectionRow>
 
           <PanelSectionRow>
-            <ButtonItem layout="below" onClick={() => setShowOptions(true)}>
+            <ButtonItem layout="below" onClick={handleShowOptions}>
               Options
             </ButtonItem>
           </PanelSectionRow>
@@ -321,6 +356,11 @@ function Content() {
           <PanelSectionRow>
             <ButtonItem layout="below" onClick={handleShowPicker}>
               {loading ? "Loading..." : "Load Route"}
+            </ButtonItem>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleShowOptions}>
+              Options
             </ButtonItem>
           </PanelSectionRow>
         </>
