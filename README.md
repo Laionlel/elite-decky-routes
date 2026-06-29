@@ -52,4 +52,4 @@ Open the plugin from the Decky menu, and it will automatically load the newest f
 
 ## License
 
-MIT License — see [LICENSE](LICENSE)
+BSD 3-Clause License — see [LICENSE](LICENSE)
