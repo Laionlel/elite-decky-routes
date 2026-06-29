@@ -1,3 +1,4 @@
+preview.html
 lib-cov
 *.seed
 *.log
@@ -33,7 +34,7 @@ bower_components
 Thumbs.db
 
 # Ignore built ts files
-dist/
+# dist/ — included so Decky can install directly from repo
 
 __pycache__/
 

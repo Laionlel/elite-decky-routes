@@ -1,11 +1,10 @@
 {
-  "name": "Example Plugin",
-  "author": "John Doe",
-  "flags": ["debug", "_root"],
+  "name": "Elite Decky Routes",
+  "author": "Laionlel",
+  "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["template", "root"],
-    "description": "Decky example plugin.",
-    "image": "https://opengraph.githubassets.com/1/SteamDeckHomebrew/PluginLoader"
+    "tags": ["elite-dangerous", "navigation", "spansh", "route"],
+    "description": "Navigate Spansh routes in Elite Dangerous without typing system names. Import a route file via SyncThing, copy the next system to your clipboard, and paste it straight into the Galaxy Map."
   }
 }

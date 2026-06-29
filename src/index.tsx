@@ -2,114 +2,339 @@ import {
   ButtonItem,
   PanelSection,
   PanelSectionRow,
-  Navigation,
-  staticClasses
+  TextField,
+  ToggleField,
+  staticClasses,
 } from "@decky/ui";
-import {
-  addEventListener,
-  removeEventListener,
-  callable,
-  definePlugin,
-  toaster,
-  // routerHook
-} from "@decky/api"
-import { useState } from "react";
+import { callable, definePlugin, toaster } from "@decky/api";
+import { useState, useEffect } from "react";
 import { FaShip } from "react-icons/fa";
 
-// import logo from "../assets/logo.png";
+type Stop = { system: string; bodies: string[]; neutron: boolean; refuel: boolean; inject: boolean; distance: number };
 
-// This function calls the python function "add", which takes in two numbers and returns their sum (as a number)
-// Note the type annotations:
-//  the first one: [first: number, second: number] is for the arguments
-//  the second one: number is for the return value
-const add = callable<[first: number, second: number], number>("add");
-
-// This function calls the python function "start_timer", which takes in no arguments and returns nothing.
-// It starts a (python) timer which eventually emits the event 'timer_event'
-const startTimer = callable<[], void>("start_timer");
+const loadFromFolder = callable<[filename: string], { success: boolean; total: number; filename?: string; error?: string }>("load_from_folder");
+const listFiles = callable<[], { success: boolean; files: string[] }>("list_files");
+const getState = callable<[], { stops: Stop[]; current_index: number; total: number; loaded_file: string; route_folder: string }>("get_state");
+const advance = callable<[], { success: boolean; current_index: number }>("advance");
+const goBack = callable<[], { success: boolean; current_index: number }>("go_back");
+const copyToClipboard = callable<[text: string], { success: boolean; error?: string }>("copy_to_clipboard");
+const clearRoute = callable<[], void>("clear_route");
+const jumpToSystem = callable<[name: string], { success: boolean; current_index?: number; error?: string }>("jump_to_system");
 
 function Content() {
-  const [result, setResult] = useState<number | undefined>();
+  const [stops, setStops] = useState<Stop[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loadedFile, setLoadedFile] = useState("");
+  const [routeFolder, setRouteFolder] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [availableFiles, setAvailableFiles] = useState<string[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [showFinder, setShowFinder] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [showOptions, setShowOptions] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
 
-  const onClick = async () => {
-    const result = await add(Math.random(), Math.random());
-    setResult(result);
+  useEffect(() => {
+    getState().then((state) => {
+      setRouteFolder(state.route_folder);
+      if (state.stops.length > 0) {
+        setStops(state.stops);
+        setCurrentIndex(state.current_index);
+        setLoadedFile(state.loaded_file);
+      } else {
+        handleLoad("", true);
+      }
+    });
+  }, []);
+
+  const refreshFileList = async () => {
+    const result = await listFiles();
+    setAvailableFiles(result.files ?? []);
+    return result.files ?? [];
   };
 
+  const handleLoad = async (filename = "", silent = false) => {
+    setLoading(true);
+    setError("");
+    const result = await loadFromFolder(filename);
+    setLoading(false);
+    if (result.success) {
+      const state = await getState();
+      setStops(state.stops);
+      setCurrentIndex(0);
+      setLoadedFile(result.filename ?? "");
+      setShowPicker(false);
+      if (!silent) {
+        toaster.toast({ title: "Route loaded", body: `${result.total} systems from ${result.filename}` });
+      }
+    } else {
+      setError(result.error ?? "Unknown error");
+    }
+  };
+
+  const handleShowPicker = async () => {
+    await refreshFileList();
+    setShowPicker(true);
+  };
+
+  const handleFind = async () => {
+    if (!findQuery.trim()) return;
+    const result = await jumpToSystem(findQuery.trim());
+    if (result.success) {
+      setCurrentIndex(result.current_index!);
+      setShowFinder(false);
+      setFindQuery("");
+    } else {
+      toaster.toast({ title: "Not found", body: result.error ?? "System not found" });
+    }
+  };
+
+  const handleCopy = async () => {
+    const system = stops[currentIndex]?.system;
+    if (!system) return;
+    const result = await copyToClipboard(system);
+    if (result.success) {
+      toaster.toast({ title: "Copied!", body: system });
+      if (autoAdvance) await handleNext();
+    } else {
+      toaster.toast({ title: "Copy failed", body: result.error ?? "Unknown error" });
+    }
+  };
+
+  const handleNext = async () => {
+    const result = await advance();
+    setCurrentIndex(result.current_index);
+    if (!result.success) {
+      toaster.toast({ title: "Route complete!", body: "You've reached the destination" });
+    }
+  };
+
+  const handleBack = async () => {
+    const result = await goBack();
+    setCurrentIndex(result.current_index);
+  };
+
+  const handleClear = async () => {
+    await clearRoute();
+    setStops([]);
+    setCurrentIndex(0);
+    setLoadedFile("");
+    setError("");
+  };
+
+  const currentStop = stops[currentIndex];
+  const nextStop = stops[currentIndex + 1];
+  const hasRoute = stops.length > 0;
+  const isLast = currentIndex >= stops.length - 1;
+  const hasBodies = currentStop?.bodies?.length > 0;
+  const hasFlags = currentStop?.neutron || currentStop?.refuel || currentStop?.inject;
+
+  if (showOptions) {
+    return (
+      <PanelSection title="Elite Deck Route">
+        <PanelSectionRow>
+          <ToggleField
+            label="Auto-advance on copy"
+            description="Automatically move to the next system after copying"
+            checked={autoAdvance}
+            onChange={setAutoAdvance}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={() => setShowOptions(false)}>
+            Back
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+    );
+  }
+
+  if (showFinder) {
+    return (
+      <PanelSection title="Elite Deck Route">
+        <PanelSectionRow>
+          <TextField
+            label="System name"
+            value={findQuery}
+            onChange={(e) => setFindQuery(e.target.value)}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={handleFind}>
+            Go to System
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={() => { setShowFinder(false); setFindQuery(""); }}>
+            Cancel
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+    );
+  }
+
+  if (showPicker) {
+    return (
+      <PanelSection title="Elite Deck Route">
+        <PanelSectionRow>
+          <div style={{ color: "#8b9bb4", fontSize: "11px" }}>Select a route file:</div>
+        </PanelSectionRow>
+        {availableFiles.length === 0 && (
+          <PanelSectionRow>
+            <div style={{ color: "#ff6b6b", fontSize: "12px" }}>No files found in folder</div>
+          </PanelSectionRow>
+        )}
+        {availableFiles.map((f) => (
+          <PanelSectionRow key={f}>
+            <ButtonItem layout="below" onClick={() => handleLoad(f)}>
+              {f}
+            </ButtonItem>
+          </PanelSectionRow>
+        ))}
+        <PanelSectionRow>
+          <ButtonItem layout="below" onClick={() => setShowPicker(false)}>
+            Cancel
+          </ButtonItem>
+        </PanelSectionRow>
+      </PanelSection>
+    );
+  }
+
   return (
-    <PanelSection title="Panel Section">
-      <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          onClick={onClick}
-        >
-          {result ?? "Add two numbers via Python"}
-        </ButtonItem>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          onClick={() => startTimer()}
-        >
-          {"Start Python timer"}
-        </ButtonItem>
-      </PanelSectionRow>
+    <PanelSection title="Elite Deck Route">
+      {hasRoute && (
+        <>
+          <PanelSectionRow>
+            <div style={{ color: "#8b9bb4", fontSize: "11px" }}>
+              Stop {currentIndex + 1} of {stops.length} · {loadedFile}
+            </div>
+          </PanelSectionRow>
 
-      {/* <PanelSectionRow>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <img src={logo} />
-        </div>
-      </PanelSectionRow> */}
+          <PanelSectionRow>
+            <div style={{ color: "#ffffff", fontSize: "15px", fontWeight: "bold", wordBreak: "break-word" }}>
+              {currentStop?.system}
+            </div>
+          </PanelSectionRow>
 
-      {/*<PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          onClick={() => {
-            Navigation.Navigate("/decky-plugin-test");
-            Navigation.CloseSideMenus();
-          }}
-        >
-          Router
-        </ButtonItem>
-      </PanelSectionRow>*/}
+          {hasFlags && (
+            <PanelSectionRow>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {currentStop.neutron && (
+                  <span style={{ background: "#4a90d9", color: "#fff", fontSize: "11px", padding: "2px 7px", borderRadius: "3px" }}>
+                    Neutron boost
+                  </span>
+                )}
+                {currentStop.refuel && (
+                  <span style={{ background: "#c8a84b", color: "#000", fontSize: "11px", padding: "2px 7px", borderRadius: "3px" }}>
+                    Refuel
+                  </span>
+                )}
+                {currentStop.inject && (
+                  <span style={{ background: "#5cb85c", color: "#fff", fontSize: "11px", padding: "2px 7px", borderRadius: "3px" }}>
+                    Inject
+                  </span>
+                )}
+              </div>
+            </PanelSectionRow>
+          )}
+
+          {hasBodies && (
+            <PanelSectionRow>
+              <div style={{ color: "#c8a84b", fontSize: "12px", lineHeight: "1.6" }}>
+                {currentStop.bodies.map((b, i) => (
+                  <div key={i}>· {b}</div>
+                ))}
+              </div>
+            </PanelSectionRow>
+          )}
+
+          {nextStop && (
+            <PanelSectionRow>
+              <div style={{ color: "#8b9bb4", fontSize: "12px" }}>
+                Next: {nextStop.system}
+                {nextStop.distance > 0 && ` · ${nextStop.distance.toFixed(1)} ly`}
+              </div>
+            </PanelSectionRow>
+          )}
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleCopy}>
+              Copy System Name
+            </ButtonItem>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleNext}>
+              {isLast ? "Route Complete" : "Done — Next System"}
+            </ButtonItem>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleBack}>
+              Previous System
+            </ButtonItem>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={() => setShowFinder(true)}>
+              Find System
+            </ButtonItem>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleShowPicker}>
+              Switch Route
+            </ButtonItem>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleClear}>
+              Clear Route
+            </ButtonItem>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={() => setShowOptions(true)}>
+              Options
+            </ButtonItem>
+          </PanelSectionRow>
+        </>
+      )}
+
+      {!hasRoute && (
+        <>
+          {error ? (
+            <PanelSectionRow>
+              <div style={{ color: "#ff6b6b", fontSize: "12px", wordBreak: "break-word" }}>
+                {error}
+              </div>
+            </PanelSectionRow>
+          ) : null}
+
+          <PanelSectionRow>
+            <div style={{ color: "#8b9bb4", fontSize: "11px", wordBreak: "break-word" }}>
+              Drop a Spansh CSV into:{"\n"}{routeFolder}
+            </div>
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ButtonItem layout="below" onClick={handleShowPicker}>
+              {loading ? "Loading..." : "Load Route"}
+            </ButtonItem>
+          </PanelSectionRow>
+        </>
+      )}
     </PanelSection>
   );
-};
+}
 
 export default definePlugin(() => {
-  console.log("Template plugin initializing, this is called once on frontend startup")
-
-  // serverApi.routerHook.addRoute("/decky-plugin-test", DeckyPluginRouterTest, {
-  //   exact: true,
-  // });
-
-  // Add an event listener to the "timer_event" event from the backend
-  const listener = addEventListener<[
-    test1: string,
-    test2: boolean,
-    test3: number
-  ]>("timer_event", (test1, test2, test3) => {
-    console.log("Template got timer_event with:", test1, test2, test3)
-    toaster.toast({
-      title: "template got timer_event",
-      body: `${test1}, ${test2}, ${test3}`
-    });
-  });
-
   return {
-    // The name shown in various decky menus
-    name: "Test Plugin",
-    // The element displayed at the top of your plugin's menu
-    titleView: <div className={staticClasses.Title}>Decky Example Plugin</div>,
-    // The content of your plugin's menu
+    name: "Elite Decky Routes",
+    titleView: <div className={staticClasses.Title}>Elite Decky Routes</div>,
     content: <Content />,
-    // The icon displayed in the plugin list
     icon: <FaShip />,
-    // The function triggered when your plugin unloads
-    onDismount() {
-      console.log("Unloading")
-      removeEventListener("timer_event", listener);
-      // serverApi.routerHook.removeRoute("/decky-plugin-test");
-    },
+    onDismount() {},
   };
 });
