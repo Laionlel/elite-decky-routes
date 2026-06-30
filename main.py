@@ -92,10 +92,17 @@ class Plugin:
                         body = row.get("Body Name", "").strip()
                         if not system:
                             continue
+                        try:
+                            scan_val = int(float(row.get("Estimated Scan Value", 0) or 0))
+                            map_val  = int(float(row.get("Estimated Mapping Value", 0) or 0))
+                        except ValueError:
+                            scan_val = map_val = 0
                         if stops and stops[-1]["system"] == system:
                             stops[-1]["bodies"].append(body)
+                            stops[-1]["scan_value"]    += scan_val
+                            stops[-1]["mapping_value"] += map_val
                         else:
-                            stops.append({"system": system, "bodies": [body], "neutron": False, "refuel": False, "inject": False, "distance": 0.0})
+                            stops.append({"system": system, "bodies": [body], "neutron": False, "refuel": False, "inject": False, "distance": 0.0, "scan_value": scan_val, "mapping_value": map_val})
                 else:
                     for row in rows:
                         system = (
@@ -116,6 +123,8 @@ class Plugin:
                                 "refuel":  row.get("Refuel", "No").strip() == "Yes",
                                 "inject":  row.get("Inject", "No").strip() == "Yes",
                                 "distance": distance,
+                                "scan_value": 0,
+                                "mapping_value": 0,
                             })
 
             elif newest.endswith(".json"):
@@ -125,13 +134,15 @@ class Plugin:
                 if isinstance(result, list):
                     for item in result:
                         bodies = [b["name"] for b in item.get("bodies", []) if b.get("name")]
-                        stops.append({"system": item.get("name", ""), "bodies": bodies, "neutron": False, "refuel": False, "inject": False, "distance": 0.0})
+                        scan_val = sum(int(b.get("estimated_scan_value", 0) or 0) for b in item.get("bodies", []))
+                        map_val  = sum(int(b.get("estimated_mapping_value", 0) or 0) for b in item.get("bodies", []))
+                        stops.append({"system": item.get("name", ""), "bodies": bodies, "neutron": False, "refuel": False, "inject": False, "distance": 0.0, "scan_value": scan_val, "mapping_value": map_val})
                 elif "system_jumps" in result:
                     jumps = result["system_jumps"]
-                    stops = [{"system": j["system"], "bodies": [], "neutron": bool(j.get("neutron_star")), "refuel": bool(j.get("must_refuel")), "inject": bool(j.get("must_inject")), "distance": float(j.get("distance", 0) or 0)} for j in jumps]
+                    stops = [{"system": j["system"], "bodies": [], "neutron": bool(j.get("neutron_star")), "refuel": bool(j.get("must_refuel")), "inject": bool(j.get("must_inject")), "distance": float(j.get("distance", 0) or 0), "scan_value": 0, "mapping_value": 0} for j in jumps]
                 elif "jumps" in result:
                     jumps = result["jumps"]
-                    stops = [{"system": j.get("name") or j.get("system", ""), "bodies": [], "neutron": bool(j.get("has_neutron")), "refuel": bool(j.get("must_refuel")), "inject": bool(j.get("must_inject")), "distance": float(j.get("distance", 0) or 0)} for j in jumps]
+                    stops = [{"system": j.get("name") or j.get("system", ""), "bodies": [], "neutron": bool(j.get("has_neutron")), "refuel": bool(j.get("must_refuel")), "inject": bool(j.get("must_inject")), "distance": float(j.get("distance", 0) or 0), "scan_value": 0, "mapping_value": 0} for j in jumps]
 
             stops = [s for s in stops if s["system"]]
 

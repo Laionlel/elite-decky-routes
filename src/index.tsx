@@ -10,7 +10,7 @@ import { callable, definePlugin, toaster } from "@decky/api";
 import { useState, useEffect } from "react";
 import { FaShip } from "react-icons/fa";
 
-type Stop = { system: string; bodies: string[]; neutron: boolean; refuel: boolean; inject: boolean; distance: number };
+type Stop = { system: string; bodies: string[]; neutron: boolean; refuel: boolean; inject: boolean; distance: number; scan_value: number; mapping_value: number };
 
 const loadFromFolder = callable<[filename: string], { success: boolean; total: number; filename?: string; error?: string }>("load_from_folder");
 const listFiles = callable<[], { success: boolean; files: string[] }>("list_files");
@@ -150,6 +150,13 @@ function Content() {
   const hasBodies = currentStop?.bodies?.length > 0;
   const hasFlags = currentStop?.neutron || currentStop?.refuel || currentStop?.inject;
 
+  const isRiches = stops.some(s => s.scan_value > 0 || s.mapping_value > 0);
+  const earnedScan    = stops.slice(0, currentIndex).reduce((a, s) => a + (s.scan_value ?? 0), 0);
+  const earnedMapping = stops.slice(0, currentIndex).reduce((a, s) => a + (s.mapping_value ?? 0), 0);
+  const totalScan     = stops.reduce((a, s) => a + (s.scan_value ?? 0), 0);
+  const totalMapping  = stops.reduce((a, s) => a + (s.mapping_value ?? 0), 0);
+  const fmt = (n: number) => n.toLocaleString() + " cr";
+
   if (showOptions) {
     return (
       <PanelSection>
@@ -280,6 +287,21 @@ function Content() {
                 {currentStop.bodies.map((b, i) => (
                   <div key={i}>· {b}</div>
                 ))}
+              </div>
+            </PanelSectionRow>
+          )}
+
+          {isRiches && (
+            <PanelSectionRow>
+              <div style={{ fontSize: "11px", lineHeight: "1.7" }}>
+                <div style={{ color: "#8b9bb4" }}>
+                  Scan: <span style={{ color: "#e8e8e8" }}>{fmt(earnedScan)}</span>
+                  <span style={{ color: "#5a6a80" }}> / {fmt(totalScan)}</span>
+                </div>
+                <div style={{ color: "#8b9bb4" }}>
+                  Map: <span style={{ color: "#e8e8e8" }}>{fmt(earnedMapping)}</span>
+                  <span style={{ color: "#5a6a80" }}> / {fmt(totalMapping)}</span>
+                </div>
               </div>
             </PanelSectionRow>
           )}
